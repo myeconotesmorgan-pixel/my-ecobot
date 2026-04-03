@@ -13,6 +13,12 @@ global.RTCSessionDescription = wrtc.RTCSessionDescription;
 global.RTCIceCandidate = wrtc.RTCIceCandidate;
 global.WebSocket = WebSocket; // ★ 新增：把 WebSocket 塞進全域變數，騙過 y-webrtc
 
+global.window = global;
+global.window.addEventListener = () => {};
+global.window.removeEventListener = () => {};
+global.navigator = { userAgent: 'node' };
+global.location = { protocol: 'https:' };
+
 const app = express();
 app.use(express.json());
 

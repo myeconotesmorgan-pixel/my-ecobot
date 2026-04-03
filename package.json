@@ -13,6 +13,7 @@
     "axios": "^1.6.0",
     "express": "^4.18.2",
     "@roamhq/wrtc": "latest",
+    "ws": "latest",
     "y-webrtc": "latest",
     "yjs": "^13.6.1"
   }

@@ -30,7 +30,7 @@ if (!ROOM_NAME) {
     process.exit(1);
 }
 
-const SECURE_ROOM_NAME = `ecolog-v6-${ROOM_NAME}${ROOM_PASSWORD ? '-' + ROOM_PASSWORD : ''}`;
+const SECURE_ROOM_NAME = encodeURIComponent(`ecolog-v6-${ROOM_NAME}${ROOM_PASSWORD ? '-' + ROOM_PASSWORD : ''}`);
 const SIGNAL_SERVER_WS = SIGNAL_SERVER_URL.replace('http', 'ws');
 
 let doc;

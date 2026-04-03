@@ -3,13 +3,15 @@ const Y = require('yjs');
 const { WebrtcProvider } = require('y-webrtc');
 const wrtc = require('@roamhq/wrtc');
 const axios = require('axios');
+const WebSocket = require('ws'); // ★ 新增：引入 WebSocket 套件
 
 // ============================================================================
-// ★ 核心魔法：讓 Node.js 擁有瀏覽器的 WebRTC 能力
+// ★ 核心魔法：讓 Node.js 擁有瀏覽器的能力 (WebRTC + WebSocket)
 // ============================================================================
 global.RTCPeerConnection = wrtc.RTCPeerConnection;
 global.RTCSessionDescription = wrtc.RTCSessionDescription;
 global.RTCIceCandidate = wrtc.RTCIceCandidate;
+global.WebSocket = WebSocket; // ★ 新增：把 WebSocket 塞進全域變數，騙過 y-webrtc
 
 const app = express();
 app.use(express.json());
@@ -78,7 +80,7 @@ app.post('/clear', (req, res) => {
 });
 
 // ============================================================================
-// 啟動伺服器並向母艦報到
+// 啟িৎ伺服器並向母艦報到
 // ============================================================================
 app.listen(PORT, async () => {
     console.log(`[EcoBot] 伺服器運行於 Port ${PORT}`);

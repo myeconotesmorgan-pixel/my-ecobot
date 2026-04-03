@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: ecobot-node
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: ROOM_NAME
+        sync: false # sync: false 代表部署時會跳出格子要求使用者手動輸入
+      - key: ROOM_PASSWORD
+        sync: false
+      - key: SIGNAL_SERVER_URL
+        value: https://my-eco-signal.onrender.com # 預設綁定你的母艦

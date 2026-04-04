@@ -2,7 +2,10 @@
 // ★ 終極偽裝術：完美模擬瀏覽器環境 (WebRTC + Crypto 亂數產生器)
 // ============================================================================
 const crypto = require('crypto');
-global.crypto = crypto.webcrypto; // ★ 破除魔王 Bug！補上瀏覽器級別的安全亂數產生器
+const { performance } = require('perf_hooks'); // ★ 新增：補上雷達需要的時鐘
+
+global.crypto = crypto.webcrypto; 
+global.performance = performance; // ★ 新增：把它塞進全域變數
 global.window = global;
 global.window.addEventListener = () => {};
 global.window.removeEventListener = () => {};

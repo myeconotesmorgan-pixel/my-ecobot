@@ -1,7 +1,24 @@
+// ============================================================================
+// ★ 終極偽裝術：完美模擬瀏覽器環境 (WebRTC + Crypto 亂數產生器)
+// ============================================================================
+const crypto = require('crypto');
+global.crypto = crypto.webcrypto; // ★ 破除魔王 Bug！補上瀏覽器級別的安全亂數產生器
+global.window = global;
+global.window.addEventListener = () => {};
+global.window.removeEventListener = () => {};
+global.navigator = { userAgent: 'node' };
+global.location = { protocol: 'https:' };
+
 const express = require('express');
 const Y = require('yjs');
-const { WebsocketProvider } = require('y-websocket');
+const wrtc = require('@roamhq/wrtc');
 const WebSocket = require('ws');
+const { WebrtcProvider } = require('y-webrtc');
+
+global.RTCPeerConnection = wrtc.RTCPeerConnection;
+global.RTCSessionDescription = wrtc.RTCSessionDescription;
+global.RTCIceCandidate = wrtc.RTCIceCandidate;
+global.WebSocket = WebSocket;
 
 const app = express();
 app.use(express.json());
@@ -12,7 +29,6 @@ const ROOM_PASSWORD = process.env.ROOM_PASSWORD || '';
 const SIGNAL_SERVER_URL = process.env.SIGNAL_SERVER_URL || 'https://my-eco-signal.onrender.com';
 const MY_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`; 
 
-// ★ 解碼後的房間名稱 (跟手機端一樣)
 const SECURE_ROOM_NAME = encodeURIComponent(`ecolog-v6-${ROOM_NAME}${ROOM_PASSWORD ? '-' + ROOM_PASSWORD : ''}`);
 const SIGNAL_SERVER_WS = SIGNAL_SERVER_URL.replace('http', 'ws');
 
@@ -23,41 +39,50 @@ function initYjs() {
     if (provider) provider.destroy();
     if (doc) doc.destroy();
 
-    console.log(`[EcoBot] 啟動 Yjs WebSocket 引擎，防護房間：${SECURE_ROOM_NAME}`);
+    console.log(`[EcoBot] 🚀 啟動 Yjs WebRTC 引擎，防護房間：${SECURE_ROOM_NAME}`);
     
     doc = new Y.Doc();
     
-    // ★ 改用 WebsocketProvider，又穩又快，而且 100% 相容 Yjs
-    provider = new WebsocketProvider(
-        SIGNAL_SERVER_WS, 
-        SECURE_ROOM_NAME, 
-        doc,
-        { WebSocketPolyfill: WebSocket } // 告訴它在 Node 裡要用 ws 套件
-    );
+    provider = new WebrtcProvider(SECURE_ROOM_NAME, doc, {
+        signaling: [SIGNAL_SERVER_WS],
+        password: null,
+        peerOpts: { 
+            wrtc: wrtc,
+            config: { iceServers: [ { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:global.stun.twilio.com:3478' } ] }
+        } 
+    });
 
-    // ★ 賦予身分證，讓 App 能看見！
     provider.awareness.setLocalState({
         id: 'ecobot-cloud-server',
-        name: '🤖 雲端留守兵 (WS)',
+        name: '🤖 雲端留守兵',
         color: '#10b981',
         ts: Date.now()
     });
 
+    // ============================================================================
+    // ★ 超級 Debug 監聽器：讓你對房間內的一切瞭若指掌
+    // ============================================================================
     provider.on('synced', synced => {
-        console.log(`[EcoBot] 網路同步狀態: ${synced}`);
+        console.log(`[EcoBot 狀態] 🔄 P2P 資料同步狀態: ${synced}`);
     });
 
-    provider.awareness.on('change', () => {
-         const onlineCount = Array.from(provider.awareness.getStates().keys()).length;
-         console.log(`[EcoBot] 雷達更新！目前連線數: ${onlineCount}`);
+    provider.on('peers', peersInfo => {
+        console.log(`[EcoBot 網路] 📡 偵測到 P2P 連線交握訊號！`);
+    });
+
+    provider.awareness.on('change', ({ added, updated, removed }) => {
+         const states = provider.awareness.getStates();
+         console.log(`[EcoBot 雷達] ⚡ 狀態更新 | 新增:${added.length} 變更:${updated.length} 移除:${removed.length}`);
+         console.log(`[EcoBot 名單] 目前房間內共有 ${states.size} 個裝置 (包含自己):`);
+         states.forEach((state, clientId) => {
+             console.log(`  - [ID: ${state.id || 'N/A'}] ${state.name || '未知裝置'}`);
+         });
     });
 }
 
 initYjs();
 
-// ============================================================================
-// API
-// ============================================================================
+// API endpoints
 app.get('/ping', (req, res) => {
     res.status(200).send('EcoBot is awake.');
 });
@@ -77,7 +102,7 @@ app.listen(PORT, async () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ roomName: ROOM_NAME, botUrl: MY_URL })
             });
-            console.log('[EcoBot] ✅ 成功向母艦報到！');
+            console.log('[EcoBot] ✅ 成功向母艦報到！保活機制已啟動。');
         } catch (err) {}
     }
 });

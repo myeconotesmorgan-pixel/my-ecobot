@@ -1,7 +1,7 @@
 {
   "name": "my-ecobot",
   "version": "1.0.0",
-  "description": "MyEcoNotes Headless Bot (WebRTC Edition)",
+  "description": "MyEcoNotes Headless Bot (WebSocket Edition)",
   "main": "index.js",
   "engines": {
     "node": "18.x"
@@ -11,9 +11,8 @@
   },
   "dependencies": {
     "express": "^4.18.2",
-    "@roamhq/wrtc": "latest",
-    "ws": "latest",
-    "y-webrtc": "latest",
-    "yjs": "^13.6.1"
+    "y-websocket": "^1.5.0",
+    "yjs": "^13.6.1",
+    "ws": "^8.13.0"
   }
 }

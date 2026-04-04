@@ -22,7 +22,7 @@ function initYjs() {
     // ★ 新增 2：賦予 EcoBot 身分證，讓手機 App 能看見它！
     provider.awareness.setLocalState({
         id: 'ecobot-cloud-server',
-        name: '🤖 雲端留守兵',
+        name: '雲端留守EcoBot',
         color: '#10b981', // 專屬的翡翠綠
         ts: Date.now()
     });

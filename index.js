@@ -93,6 +93,9 @@ app.post('/open-room', (req, res) => {
     res.status(200).json({ success: true });
 });
 
+// ============================================================================
+// ★ 模組 C：精準關閉與「重新開門」機制
+// ============================================================================
 app.post('/close-room', (req, res) => {
     const { roomName } = req.body;
     if (!roomName) return res.status(400).json({ error: 'Missing roomName' });
@@ -102,8 +105,15 @@ app.post('/close-room', (req, res) => {
 
     const docObj = docs.get(roomName);
     if (docObj) {
-        docObj.conns.forEach((_, ws) => ws.close(4003, 'Survey Closed'));
-        docObj.doc.destroy();
+        // 1. 踢人下線 (加上 try-catch 防護)
+        docObj.conns.forEach((_, ws) => {
+            try { ws.close(4003, 'Survey Closed'); } catch (e) {}
+        });
+        
+        // 2. ★ 修正：docObj 本人就是文件，直接銷毀它！
+        docObj.destroy();
+        
+        // 3. 從名單中剔除
         docs.delete(roomName);
         console.log(`[EcoBot] 🧹 房間 ${roomName} 的記憶體資料已徹底清空！`);
     }

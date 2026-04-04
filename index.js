@@ -78,6 +78,20 @@ app.post('/bg-sync', (req, res) => {
 // ============================================================================
 // ★ 模組 C：精準關閉房間機制
 // ============================================================================
+app.post('/open-room', (req, res) => {
+    const { roomName } = req.body;
+    if (!roomName) return res.status(400).json({ error: 'Missing roomName' });
+
+    // ★ 開門機制：如果房間在黑名單裡，把它移除，允許重新調查！
+    if (closedRooms.has(roomName)) {
+        closedRooms.delete(roomName);
+        console.log(`[EcoBot] 🔓 收到開門指令！已解除房間封鎖：${roomName}`);
+    } else {
+        console.log(`[EcoBot] 🟢 收到喚醒指令！房間準備就緒：${roomName}`);
+    }
+    res.status(200).json({ success: true });
+});
+
 app.post('/close-room', (req, res) => {
     const { roomName } = req.body;
     if (!roomName) return res.status(400).json({ error: 'Missing roomName' });

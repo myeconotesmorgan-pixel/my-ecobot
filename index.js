@@ -5,7 +5,6 @@ const Y = require('yjs');
 const { setupWSConnection, docs } = require('y-websocket/bin/utils');
 
 const app = express();
-// ★ 允許接收較大的 JSON 封包 (因為時空膠囊可能有點大)
 app.use(express.json({ limit: '50mb' })); 
 
 const server = http.createServer(app);
@@ -16,24 +15,31 @@ const ROOM_NAME = process.env.ROOM_NAME || 'DefaultSquad';
 const SIGNAL_SERVER_URL = process.env.SIGNAL_SERVER_URL || 'https://my-eco-signal.onrender.com';
 const MY_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`; 
 
+// ★ 新增：已結束調查的房間黑名單
+const closedRooms = new Set();
+
 // ============================================================================
-// 模組 A：處理前台 App 的 WebSocket 即時連線
+// 模組 A：WebSocket 即時連線 (加入鐵門檢查)
 // ============================================================================
 wss.on('connection', (conn, req) => {
+    const roomName = req.url.slice(1).split('?')[0];
+    
+    // ★ 鐵門機制 1：如果房間已關閉，直接踢掉連線！
+    if (closedRooms.has(roomName)) {
+        console.log(`[EcoBot] ⛔ 拒絕連線：房間 ${roomName} 已結束調查`);
+        conn.close(4003, 'Survey Closed'); // 4003 是自訂關閉碼
+        return;
+    }
+
     setupWSConnection(conn, req, { gc: true });
     
-    const roomName = req.url.slice(1).split('?')[0];
     const docObj = docs.get(roomName);
-    
     if (docObj && !docObj.botInitialized) {
         docObj.botInitialized = true;
         console.log(`[EcoBot] 🚀 成功啟動房間：${roomName}`);
         
         docObj.awareness.setLocalState({
-            id: 'ecobot-cloud-server',
-            name: '🤖 雲端留守兵',
-            color: '#10b981',
-            ts: Date.now()
+            id: 'ecobot-cloud-server', name: '🤖 雲端留守兵', color: '#10b981', ts: Date.now()
         });
 
         docObj.awareness.on('change', () => {
@@ -44,20 +50,21 @@ wss.on('connection', (conn, req) => {
 });
 
 // ============================================================================
-// 模組 B：處理背景 Java 的時空膠囊 (盲投遞)
+// 模組 B：時空膠囊盲投遞 (加入鐵門檢查)
 // ============================================================================
 app.post('/bg-sync', (req, res) => {
     try {
         const { roomName, updateBase64 } = req.body;
         if (!roomName || !updateBase64) return res.status(400).json({ error: 'Missing data' });
 
-        // 取得房間的 Yjs 文件 (如果不存在，y-websocket 會自動創建)
-        const docObj = docs.get(roomName);
+        // ★ 鐵門機制 2：房間關閉，退回盲投遞，並告訴手機「調查結束了」
+        if (closedRooms.has(roomName)) {
+            console.log(`[EcoBot] ⛔ 拒絕膠囊：房間 ${roomName} 已結束調查`);
+            return res.status(403).json({ error: 'Survey Closed' }); // 回傳 403 禁止訪問
+        }
 
-        // 將 Base64 解碼成 Uint8Array
+        const docObj = docs.get(roomName);
         const updateBuffer = Buffer.from(updateBase64, 'base64');
-        
-        // ★ Yjs 魔法：將膠囊縫合進雲端記憶體
         Y.applyUpdate(docObj.doc, updateBuffer);
 
         console.log(`[EcoBot] 📦 收到野外盲投遞膠囊！已成功縫合至房間：${roomName}`);
@@ -69,16 +76,28 @@ app.post('/bg-sync', (req, res) => {
 });
 
 // ============================================================================
-// 系統基礎 API
+// ★ 模組 C：精準關閉房間機制
 // ============================================================================
-app.get('/ping', (req, res) => res.status(200).send('EcoBot is awake.'));
+app.post('/close-room', (req, res) => {
+    const { roomName } = req.body;
+    if (!roomName) return res.status(400).json({ error: 'Missing roomName' });
 
-app.post('/clear', (req, res) => {
-    docs.forEach(docObj => docObj.doc.destroy());
-    docs.clear();
-    console.log('[EcoBot] 🚨 收到清空指令！已銷毀記憶體資料...');
+    console.log(`[EcoBot] 🚨 收到關閉指令！拉下鐵門，永久封鎖房間：${roomName}`);
+    closedRooms.add(roomName); // 加入黑名單
+
+    const docObj = docs.get(roomName);
+    if (docObj) {
+        // 1. 把目前還連著的隊員無情踢下線
+        docObj.conns.forEach((_, ws) => ws.close(4003, 'Survey Closed'));
+        // 2. 銷毀記憶體
+        docObj.doc.destroy();
+        docs.delete(roomName);
+    }
+
     res.status(200).json({ success: true });
 });
+
+app.get('/ping', (req, res) => res.status(200).send('EcoBot is awake.'));
 
 server.listen(PORT, async () => {
     console.log(`[EcoBot] 伺服器運行於 Port ${PORT}`);

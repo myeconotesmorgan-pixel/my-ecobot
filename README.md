@@ -6,7 +6,7 @@
 
 點擊下方按鈕，即可將萬用機器人部署至你的 Render 帳號。部署完成後，將產生的網址貼回 App 的「團隊設定」即可開始使用。
 
-[![一鍵部署EcoBot](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/myeconotesmorgan-pixel/my-ecobot)
+[![Deploy Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/myeconotesmorgan-pixel/my-ecobot)
 ### 🌟 特色
 - **萬用房間**：一個機器人即可支援無數個調查小隊與房間。
 - **動態開門**：領隊開啟調查時自動向母艦報到。

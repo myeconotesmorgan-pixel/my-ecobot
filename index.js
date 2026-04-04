@@ -1,47 +1,3 @@
-const express = require('express');
-const Y = require('yjs');
-const { WebrtcProvider } = require('y-webrtc');
-const wrtc = require('@roamhq/wrtc');
-const axios = require('axios');
-const WebSocket = require('ws'); // ★ 新增：引入 WebSocket 套件
-
-// ============================================================================
-// ★ 核心魔法：讓 Node.js 擁有瀏覽器的能力 (WebRTC + WebSocket)
-// ============================================================================
-global.RTCPeerConnection = wrtc.RTCPeerConnection;
-global.RTCSessionDescription = wrtc.RTCSessionDescription;
-global.RTCIceCandidate = wrtc.RTCIceCandidate;
-global.WebSocket = WebSocket; // ★ 新增：把 WebSocket 塞進全域變數，騙過 y-webrtc
-
-global.window = global;
-global.window.addEventListener = () => {};
-global.window.removeEventListener = () => {};
-global.navigator = { userAgent: 'node' };
-global.location = { protocol: 'https:' };
-
-const app = express();
-app.use(express.json());
-
-// ============================================================================
-// 環境變數接收 (來自 Render 的輸入框)
-// ============================================================================
-const PORT = process.env.PORT || 3000;
-const ROOM_NAME = process.env.ROOM_NAME;
-const ROOM_PASSWORD = process.env.ROOM_PASSWORD || '';
-const SIGNAL_SERVER_URL = process.env.SIGNAL_SERVER_URL || 'https://my-eco-signal.onrender.com';
-const MY_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`; 
-
-if (!ROOM_NAME) {
-    console.error("❌ 嚴重錯誤：未設定 ROOM_NAME 環境變數！機器人無法啟動。");
-    process.exit(1);
-}
-
-const SECURE_ROOM_NAME = encodeURIComponent(`ecolog-v6-${ROOM_NAME}${ROOM_PASSWORD ? '-' + ROOM_PASSWORD : ''}`);
-const SIGNAL_SERVER_WS = SIGNAL_SERVER_URL.replace('http', 'ws');
-
-let doc;
-let provider;
-
 // ============================================================================
 // 引擎啟動與銷毀機制
 // ============================================================================
@@ -56,7 +12,19 @@ function initYjs() {
     provider = new WebrtcProvider(SECURE_ROOM_NAME, doc, {
         signaling: [SIGNAL_SERVER_WS],
         password: null,
-        peerOpts: { wrtc: wrtc } 
+        peerOpts: { 
+            wrtc: wrtc,
+            // ★ 新增 1：賦予 EcoBot 穿透防火牆的 STUN 伺服器
+            config: { iceServers: [ { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:global.stun.twilio.com:3478' } ] }
+        } 
+    });
+
+    // ★ 新增 2：賦予 EcoBot 身分證，讓手機 App 能看見它！
+    provider.awareness.setLocalState({
+        id: 'ecobot-cloud-server',
+        name: '🤖 雲端留守兵',
+        color: '#10b981', // 專屬的翡翠綠
+        ts: Date.now()
     });
 
     provider.on('synced', synced => {
@@ -68,39 +36,3 @@ function initYjs() {
          console.log(`[EcoBot] 雷達更新！目前 P2P 通道連線數: ${onlineCount}`);
     });
 }
-
-initYjs();
-
-// ============================================================================
-// HTTP API 控制介面
-// ============================================================================
-
-app.get('/ping', (req, res) => {
-    res.status(200).send('EcoBot is awake and guarding the data.');
-});
-
-app.post('/clear', (req, res) => {
-    console.log('[EcoBot] 🚨 收到清空指令！正在銷毀調查資料...');
-    initYjs(); 
-    res.status(200).json({ success: true, message: 'Data wiped successfully' });
-});
-
-// ============================================================================
-// 啟িৎ伺服器並向母艦報到
-// ============================================================================
-app.listen(PORT, async () => {
-    console.log(`[EcoBot] 伺服器運行於 Port ${PORT}`);
-    console.log(`[EcoBot] 外部網址: ${MY_URL}`);
-
-    if (process.env.RENDER_EXTERNAL_URL) {
-        try {
-            await axios.post(`${SIGNAL_SERVER_URL}/register-bot`, {
-                roomName: ROOM_NAME,
-                botUrl: MY_URL
-            });
-            console.log('[EcoBot] ✅ 成功向母艦報到！保活機制已啟動。');
-        } catch (err) {
-            console.error('[EcoBot] ⚠️ 向母艦報到失敗 (請確認母艦是否已更新 API):', err.message);
-        }
-    }
-});

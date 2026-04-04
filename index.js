@@ -2,7 +2,8 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const Y = require('yjs');
-const { setupWSConnection, docs } = require('y-websocket/bin/utils');
+// ★ 修正：引入 getYDoc，用來自動生成新房間
+const { setupWSConnection, docs, getYDoc } = require('y-websocket/bin/utils');
 
 const app = express();
 app.use(express.json({ limit: '50mb' })); 
@@ -47,48 +48,48 @@ app.post('/bg-sync', (req, res) => {
         if (!roomName || !updateBase64) return res.status(400).json({ error: 'Missing data' });
         if (closedRooms.has(roomName)) return res.status(403).json({ error: 'Survey Closed' }); 
 
-        const docObj = docs.get(roomName);
+        // ★ 修正 1：使用 getYDoc，確保房間存在
+        const docObj = getYDoc(roomName, true); 
         const updateBuffer = Buffer.from(updateBase64, 'base64');
-        Y.applyUpdate(docObj.doc, updateBuffer);
+        
+        // ★ 修正 2：docObj 本身就是 Y.Doc，不要再加 .doc 了
+        Y.applyUpdate(docObj, updateBuffer); 
+        
+        console.log(`[EcoBot] 📦 收到野外盲投遞膠囊！已成功縫合至房間：${roomName}`);
         res.status(200).json({ success: true });
     } catch(e) {
+        console.error('[EcoBot] bg-sync 發生錯誤:', e);
         res.status(500).json({ error: 'Internal error' });
     }
 });
 
-// ============================================================================
-// ★ 新增模組：接收 Java 丟來的「覆蓋式加密座標」
-// ============================================================================
+// 模組 C：接收 Java 丟來的「覆蓋式加密座標」
 app.post('/bg-location', (req, res) => {
     try {
         const { roomName, userId, payload } = req.body;
         if (!roomName || !userId || !payload) return res.status(400).json({ error: 'Missing data' });
         if (closedRooms.has(roomName)) return res.status(403).json({ error: 'Closed' });
 
-        const docObj = docs.get(roomName);
-        
-        // ★ 核心魔法：使用 Y.Map，相同的 userId 會自動覆蓋舊資料，永遠不會撐爆記憶體！
-        const locMap = docObj.doc.getMap('bg-locations');
+        // ★ 修正 3：同樣使用 getYDoc 與直接操作 docObj
+        const docObj = getYDoc(roomName, true);
+        const locMap = docObj.getMap('bg-locations');
         locMap.set(userId, payload); 
 
         res.status(200).json({ success: true });
     } catch(e) {
+        console.error('[EcoBot] bg-location 發生錯誤:', e);
         res.status(500).json({ error: 'Error' });
     }
 });
 
-// ============================================================================
-// ★ 萬用開門機制：動態向母艦報到
-// ============================================================================
+// 模組 D：萬用開門機制與向母艦報到
 app.post('/open-room', async (req, res) => {
     const { roomName } = req.body;
     if (!roomName) return res.status(400).json({ error: 'Missing roomName' });
 
     if (closedRooms.has(roomName)) closedRooms.delete(roomName);
-    
     console.log(`[EcoBot] 🟢 萬用房間啟動：${roomName}，向母艦報到中...`);
     
-    // 開門時，才去跟母艦 (信號伺服器) 說：「這個房間我負責罩了！」
     try {
         await fetch(`${SIGNAL_SERVER_URL}/register-bot`, {
             method: 'POST',

@@ -39,7 +39,7 @@ wss.on('connection', (conn, req) => {
     if (docObj && !docObj.botInitialized) {
         docObj.botInitialized = true;
         console.log(`[EcoBot] 房間 ${roomName} 啟動！`);
-        docObj.awareness.setLocalState({ id: 'ecobot-cloud-server', name: '🤖 雲端留守兵', color: '#10b981', ts: Date.now() });
+        docObj.awareness.setLocalState({ id: 'ecobot-cloud-server', name: '🤖 雲端留守員', color: '#10b981', ts: Date.now() });
     }
 });
 
